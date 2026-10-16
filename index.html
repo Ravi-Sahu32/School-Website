@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>School Gallery</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="gallery-topbar">
+  <div class="topbar-left">
+    <span>🏫</span>
+    <span class="topbar-title">School Gallery</span>
+  </div>
+  <a href="/project1/index.html" class="back-btn">🏠 Back to Home</a>
+</div>
+
+<div class="gallery-hero">
+  <h1>📸 School Photo Gallery</h1>
+  <p>Photos uploaded by admin — Click any photo to view</p>
+  <span id="heroCount" class="hero-count">Loading...</span>
+</div>
+
+<div class="filter-bar">
+  <input type="text" id="searchBox" placeholder="🔍 Search images by name..." oninput="filterImages()">
+  <select id="sortSelect" onchange="loadGallery()">
+    <option value="new">Newest First</option>
+    <option value="old">Oldest First</option>
+  </select>
+</div>
+
+<div class="gallery-section">
+  <div id="galleryGrid" class="gallery-grid">
+    <div class="loading-box"><div class="spinner"></div><p>Loading gallery...</p></div>
+  </div>
+  <div id="emptyState" class="empty-state" style="display:none;">
+    <div style="font-size:64px;">📭</div>
+    <h2>No Images Yet</h2>
+    <p>Admin hasn't uploaded any images yet.</p>
+    <a href="/project1/index.html" class="admin-link-btn">Admin: Upload Images</a>
+  </div>
+  <div id="noResult" class="empty-state" style="display:none;">
+    <div style="font-size:64px;">🔍</div>
+    <h2>No Results Found</h2>
+    <button onclick="clearSearch()" class="admin-link-btn">Clear Search</button>
+  </div>
+</div>
+
+<!-- LIGHTBOX -->
+<div id="lightbox" class="lightbox" onclick="closeLightbox()">
+  <div class="lightbox-inner" onclick="event.stopPropagation()">
+    <button class="lb-close" onclick="closeLightbox()">✕</button>
+    <button class="lb-nav lb-prev" onclick="navigate(-1)">&#8249;</button>
+    <button class="lb-nav lb-next" onclick="navigate(1)">&#8250;</button>
+    <img id="lbImg" src="" alt="">
+    <div class="lb-info">
+      <p id="lbName" class="lb-name"></p>
+      <p id="lbDate" class="lb-date"></p>
+      <p id="lbCounter" class="lb-counter"></p>
+    </div>
+  </div>
+</div>
+
+<div class="gallery-footer">
+  <p>📧 Myschool00018@gmail.com &nbsp;|&nbsp; 📞 +91 9236942184</p>
+</div>
+
+<script>
+const API = 'http://localhost:3000';
+let allImages = [], filteredImages = [], currentIndex = 0;
+
+async function loadGallery() {
+  const grid = document.getElementById('galleryGrid');
+  const sort = document.getElementById('sortSelect').value;
+  grid.innerHTML = '<div class="loading-box"><div class="spinner"></div><p>Loading...</p></div>';
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('noResult').style.display = 'none';
+  try {
+    const res = await fetch(`${API}/api/gallery`);
+    const data = await res.json();
+    if (!data.success || !data.images || data.images.length === 0) {
+      grid.innerHTML = '';
+      document.getElementById('emptyState').style.display = 'block';
+      document.getElementById('heroCount').textContent = '0 photos';
+      return;
+    }
+    allImages = data.images;
+    if (sort === 'old') allImages = [...allImages].reverse();
+    filteredImages = [...allImages];
+    document.getElementById('heroCount').textContent = allImages.length + ' photos';
+    renderGrid(filteredImages);
+  } catch (e) {
+    grid.innerHTML = '<div class="loading-box" style="color:#c0392b;">❌ Cannot connect to server.<br><small>Run: cd backend → node server.js</small></div>';
+  }
+}
+
+function renderGrid(images) {
+  const grid = document.getElementById('galleryGrid');
+  document.getElementById('noResult').style.display = 'none';
+  document.getElementById('emptyState').style.display = 'none';
+  if (images.length === 0) {
+    grid.innerHTML = '';
+    document.getElementById(allImages.length > 0 ? 'noResult' : 'emptyState').style.display = 'block';
+    return;
+  }
+  grid.innerHTML = images.map((img, idx) => `
+    <div class="gallery-card" onclick="openLightbox(${idx})" style="animation-delay:${idx * 0.04}s">
+      <div class="card-img-wrap">
+        <img src="${API}/uploads/${img.filename}" alt="${img.original_name}" loading="lazy">
+        <div class="card-overlay"><span>🔍</span></div>
+      </div>
+      <div class="card-info">
+        <p class="card-name" title="${img.original_name}">${img.original_name}</p>
+        <p class="card-date">📅 ${new Date(img.uploaded_at).toLocaleDateString('en-IN', {day:'numeric',month:'short',year:'numeric'})}</p>
+      </div>
+    </div>`).join('');
+}
+
+function filterImages() {
+  const q = document.getElementById('searchBox').value.toLowerCase();
+  filteredImages = allImages.filter(img => img.original_name.toLowerCase().includes(q));
+  renderGrid(filteredImages);
+}
+
+function clearSearch() {
+  document.getElementById('searchBox').value = '';
+  filteredImages = [...allImages];
+  renderGrid(filteredImages);
+}
+
+function openLightbox(idx) {
+  currentIndex = idx; updateLightbox();
+  document.getElementById('lightbox').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+function updateLightbox() {
+  const img = filteredImages[currentIndex];
+  document.getElementById('lbImg').src = `${API}/uploads/${img.filename}`;
+  document.getElementById('lbName').textContent = '📎 ' + img.original_name;
+  document.getElementById('lbDate').textContent = '📅 ' + new Date(img.uploaded_at).toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'});
+  document.getElementById('lbCounter').textContent = `${currentIndex+1} / ${filteredImages.length}`;
+}
+function navigate(dir) {
+  currentIndex = (currentIndex + dir + filteredImages.length) % filteredImages.length;
+  document.getElementById('lbImg').style.opacity = '0';
+  setTimeout(() => { updateLightbox(); document.getElementById('lbImg').style.opacity = '1'; }, 150);
+}
+function closeLightbox() {
+  document.getElementById('lightbox').style.display = 'none';
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', (e) => {
+  if (document.getElementById('lightbox').style.display === 'flex') {
+    if (e.key === 'ArrowRight') navigate(1);
+    if (e.key === 'ArrowLeft') navigate(-1);
+    if (e.key === 'Escape') closeLightbox();
+  }
+});
+window.onload = loadGallery;
+</script>
+</body>
+</html>
